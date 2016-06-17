@@ -48,8 +48,56 @@ class SkeletonData():
         self.filaments_data = []
 
 
-    def _SNR(self, flux, ivar):
-        pass
+class CriticalPoint():
+    """ A class to represent NDskeleton [CRITICAL POINTS] """
+
+    def __init__(self, lines=None):
+        # header line for this critical point
+        header_line_split = lines[0].split(' ')
+        self.type = np.int(header_line_split[0])
+        self.pos = np.array([np.int64(pos) for pos in header_line_split[1:-3]])
+        self.value = np.float64(header_line_split[-3])
+        self.pairID = np.int64(header_line_split[-2])
+        self.boundary = np.int64(header_line_split[-1])
+        # ndim infered from string length
+        self.ndim_infered = len(header_line_split) - 4
+
+        # nfil
+        self.nfil = np.int64(lines[1].split(' ')[1])
+        assert self.nfil == len(lines) - 2
+
+        # destId & filId
+        self.data = np.nan * np.ones((self.nfil, 2), dtype=np.int64)
+        self.destId = np.nan * np.ones((self.nfil, 1), dtype=np.int64)
+        self.filId = np.nan * np.ones((self.nfil, 1), dtype=np.int64)
+        for i in xrange(self.nfil):
+            line_split = lines[i + 2].split(' ')
+            self.destId[i] = np.int64(line_split[1])
+            self.filId[i] = np.int64(line_split[2])
+            self.data[i, :] = np.array([self.destId[i], self.filId[i]]).flatten()
+
+
+class Filament():
+    """ A class to represent NDskeleton [FILAMENTS] """
+
+    def __init__(self, lines=None):
+        # header line for this filament
+        header_line_split = lines[0].split(' ')
+        self.cp1 = np.int64(header_line_split[0])
+        self.cp2 = np.int64(header_line_split[1])
+        self.nsamp = np.int64(header_line_split[2])
+        assert self.nsamp == len(lines) - 1
+
+        # ndim infered from string length
+        self.ndim_infered = len(lines[1].split(' ')) - 1
+
+        # pos
+        self.P = np.nan * np.ones((self.nsamp, self.ndim_infered), dtype=np.float64)
+        for i in xrange(self.nsamp):
+            line_split = lines[i + 1].split(' ')
+            for j in xrange(self.ndim_infered):
+                self.P[i, j] = np.float64(line_split[j + 1])
+
 
 def _find_data_block_position():
     """find the head and tail line for 4 data blocks
