@@ -23,6 +23,7 @@ Aims
 
 """
 
+import tempfile
 import numpy as np
 from astropy.table import Table
 
@@ -55,7 +56,7 @@ class CriticalPoint():
         # header line for this critical point
         header_line_split = lines[0].split(' ')
         self.type = np.int(header_line_split[0])
-        self.pos = np.array([np.int64(pos) for pos in header_line_split[1:-3]])
+        self.pos = np.array([np.float64(pos) for pos in header_line_split[1:-3]])
         self.value = np.float64(header_line_split[-3])
         self.pairID = np.int64(header_line_split[-2])
         self.boundary = np.int64(header_line_split[-1])
@@ -63,7 +64,11 @@ class CriticalPoint():
         self.ndim_infered = len(header_line_split) - 4
 
         # nfil
-        self.nfil = np.int64(lines[1].split(' ')[1])
+        try:
+            self.nfil = np.int64(lines[1].split(' ')[1])
+        except:
+            print lines[1]
+            print lines[1].split(' ')[1]
         assert self.nfil == len(lines) - 2
 
         # destId & filId
@@ -110,25 +115,90 @@ def _find_data_block_position():
     pass
 
 
-def _read_data_block_critical_points():
-    pass
+def _read_data_critical_points(lines):
+    # determine number of cp
+    n_critical_points = np.int32(lines[1])
+
+    # lines without header
+    lines_no_head = lines[2:]
+
+    # determine start line for each cp
+    i1 = []
+    for i, line in enumerate(lines_no_head):
+        if not line[0] == ' ':
+            i1.append(i)
+
+    i1 = np.array(i1)
+
+    assert len(i1) == n_critical_points
+
+    # determine end line for each cp
+    i2 = np.zeros_like(i1)
+    i2[0:-1] = i1[1:]
+    i2[-1] = len(lines_no_head)
+
+    critical_point_list = []
+    for i in xrange(n_critical_points):
+        critical_point_list.append(CriticalPoint(lines_no_head[i1[i]:i2[i]]))
 
 
-def _read_data_block_critical_points_data():
-    pass
+    return critical_point_list
 
 
-def _read_data_block_filaments():
-    pass
+def _read_data_filaments(lines):
+    # determine number of filaments
+    n_filaments = np.int32(lines[1])
+
+    # lines without header
+    lines_no_head = lines[2:]
+
+    # determine start line for each cp
+    i1 = []
+    for i, line in enumerate(lines_no_head):
+        if not line[0] == ' ':
+            i1.append(i)
+
+    i1 = np.array(i1, dtype=np.int64)
+
+    assert len(i1) == n_filaments
+
+    # determine end line for each cp
+    i2 = np.zeros(i1.shape, dtype=np.int64)
+    i2[0:-1] = i1[1:]
+    i2[-1] = len(lines_no_head)
+
+    filaments_list = []
+    for i in xrange(n_filaments):
+        filaments_list.append(CriticalPoint(lines_no_head[i1[i]:i2[i]]))
+
+    return filaments_list
 
 
-def _read_data_block_filaments_data():
-    pass
+def _read_data_data_table(lines):
+    nf = np.int32(lines[1])
+
+    # make temp file
+    f = tempfile.TemporaryFile()
+    # write header line
+    f.write(lines[2:2+nf].join(' '))
+    f.write('\n')
+    # write data
+    for i in xrange(2+nf, len(lines)):
+        f.write(lines[i])
+        f.write('\n')
+
+    # read table
+    block_data_table = Table.read(f, format='ascii')
+
+    # close temp file
+    f.close()
+
+    return block_data_table
 
 
 def test_on_data():
     # test data
-    test_data_file_path = './DisPerSE/data/N.fits.up.NDskl.a.NDskl'
+    test_data_file_path = './data/N.fits.up.NDskl.a.NDskl'
 
     # read file
     f = open(test_data_file_path, mode='r')
@@ -157,6 +227,8 @@ def test_on_data():
     n_lines_blocks[:-1, 1] = n_lines[1:].flatten()
     n_lines_blocks[-1, 1] = len(lines)
     print n_lines_blocks
+    for i in xrange(len(n_lines_blocks)):
+        print lines[n_lines_blocks[i, 0]]
 
 
     # skeldata = []
@@ -176,17 +248,32 @@ def test_on_data():
     bbox_delta = np.array(eval(bbox_str_seped[2]))
 
     # 5. critical points
-    lines[n_lines_blocks[1, 0]+1:n_lines_blocks[1, 1]]
+    print 'debug'
+    print lines[n_lines_blocks[1, 0]:n_lines_blocks[1, 1]][0]
+    print lines[n_lines_blocks[1, 0]:n_lines_blocks[1, 1]][-1]
+    cp = _read_data_critical_points(lines[n_lines_blocks[1, 0]:n_lines_blocks[1, 1]])
 
     # 6. filaments
-    lines[n_lines_blocks[2, 0]+1:n_lines_blocks[2, 1]]
+    print 'debug'
+    print lines[n_lines_blocks[2, 0]:n_lines_blocks[2, 1]][0]
+    print lines[n_lines_blocks[2, 0]:n_lines_blocks[2, 1]][-1]
+    fl = _read_data_filaments(lines[n_lines_blocks[2, 0]:n_lines_blocks[2, 1]])
 
     # 7. critical points data
-    lines[n_lines_blocks[3, 0]+1:n_lines_blocks[3, 1]]
+    print 'debug'
+    print lines[n_lines_blocks[3, 0]:n_lines_blocks[3, 1]][0]
+    print lines[n_lines_blocks[3, 0]:n_lines_blocks[3, 1]][-1]
+    cp_data = _read_data_data_table(lines[n_lines_blocks[3, 0]:n_lines_blocks[3, 1]])
 
     # 8. filaments data
-    lines[n_lines_blocks[4, 0]+1:n_lines_blocks[4, 1]]
+    print 'debug'
+    print lines[n_lines_blocks[4, 0]:n_lines_blocks[4, 1]][0]
+    print lines[n_lines_blocks[4, 0]:n_lines_blocks[4, 1]][-1]
+    fl_data = _read_data_data_table(lines[n_lines_blocks[4, 0]:n_lines_blocks[4, 1]])
 
+    return cp, cp_data, fl, fl_data
 
 if __name__ == '__main__':
-    test_on_data()
+    import os
+    print os.getcwd()
+    result = test_on_data()
