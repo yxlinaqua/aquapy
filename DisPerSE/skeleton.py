@@ -78,7 +78,7 @@ class SkeletonData():
                            '[FILAMENTS]',
                            '[CRITICAL POINTS DATA]',
                            '[FILAMENTS DATA]'],
-            verbose=True)
+            verbose=False)
 
         # 1. header
         assert lines[0] == 'ANDSKEL'
@@ -88,10 +88,10 @@ class SkeletonData():
         self.ndim = np.int(lines[1])
 
         # 3. comments
-        self.comments = lines[2:n_lines_blocks[0, 0]]
+        self.comments = lines[2:n_lines_blocks[0]]
 
         # 4. bbox (assumed to be single-line)
-        bbox_str_seped = lines[n_lines_blocks[0, 0]].split(' ')
+        bbox_str_seped = lines[n_lines_blocks[0]].split(' ')
         self.bbox_x0 = np.array(eval(bbox_str_seped[1]))
         self.bbox_delta = np.array(eval(bbox_str_seped[2]))
 
@@ -99,25 +99,25 @@ class SkeletonData():
         # print 'debug'
         # print lines[n_lines_blocks[1, 0]:n_lines_blocks[1, 1]][0]
         # print lines[n_lines_blocks[1, 0]:n_lines_blocks[1, 1]][-1]
-        self.cp = _read_data_critical_points(lines[n_lines_blocks[1, 0]:n_lines_blocks[1, 1]])
+        self.cp = _read_data_critical_points(lines[n_lines_blocks[1]:n_lines_blocks[2]])
 
         # 6. filaments
         # print 'debug'
         # print lines[n_lines_blocks[2, 0]:n_lines_blocks[2, 1]][0]
         # print lines[n_lines_blocks[2, 0]:n_lines_blocks[2, 1]][-1]
-        self.fl = _read_data_filaments(lines[n_lines_blocks[2, 0]:n_lines_blocks[2, 1]])
+        self.fl = _read_data_filaments(lines[n_lines_blocks[2]:n_lines_blocks[3]])
 
         # 7. critical points data
         # print 'debug'
         # print lines[n_lines_blocks[3, 0]:n_lines_blocks[3, 1]][0]
         # print lines[n_lines_blocks[3, 0]:n_lines_blocks[3, 1]][-1]
-        self.cp_data = _read_data_data_table(lines[n_lines_blocks[3, 0]:n_lines_blocks[3, 1]])
+        self.cp_data = _read_data_data_table(lines[n_lines_blocks[3]:n_lines_blocks[4]])
 
         # 8. filaments data
         # print 'debug'
         # print lines[n_lines_blocks[4, 0]:n_lines_blocks[4, 1]][0]
         # print lines[n_lines_blocks[4, 0]:n_lines_blocks[4, 1]][-1]
-        self.fl_data = _read_data_data_table(lines[n_lines_blocks[4, 0]:n_lines_blocks[4, 1]])
+        self.fl_data = _read_data_data_table(lines[n_lines_blocks[4]:-1])
 
         # change flag
         self.data_loaded = True
@@ -278,7 +278,7 @@ def _find_data_block_position(lines, keywords_list, verbose=True):
         a 4x2 numpy array including the head and tail line
     """
     # find keywords
-    n_lines = np.zeros((len(keywords_list), 1), dtype=np.int)
+    n_lines = np.zeros((len(keywords_list), ), dtype=np.int)
     for i_keyword, keyword in enumerate(keywords_list):
         for i_line, line in enumerate(lines):
             if line.find(keyword) > -1:
@@ -286,19 +286,14 @@ def _find_data_block_position(lines, keywords_list, verbose=True):
                 print('@Cham: found keyword ''%s'' in Line %d ...'
                       % (keyword, i_line+1))
                 break
-    # find n_lines for each of the blocks
-    n_lines_blocks = np.zeros((len(keywords_list), 2), dtype=np.int)
-    n_lines_blocks[:, 0] = n_lines.flatten()
-    n_lines_blocks[:-1, 1] = n_lines[1:].flatten()
-    n_lines_blocks[-1, 1] = len(lines)
 
     # verbose
     if verbose:
-        print n_lines_blocks
-        for i in xrange(len(n_lines_blocks)):
-            print lines[n_lines_blocks[i, 0]]
+        # print n_lines
+        for i in xrange(len(n_lines)):
+            print lines[n_lines[i]]
 
-    return n_lines_blocks
+    return n_lines
 
 
 def test_on_data():
