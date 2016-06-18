@@ -23,6 +23,7 @@ Aims
 
 """
 
+import os
 import tempfile
 import numpy as np
 from astropy.table import Table
@@ -39,7 +40,7 @@ class SkeletonData():
         self.filepath = filepath
         self.data_loaded = False
         self.header = ''
-        self.ndim = 0
+        self.ndim = -1
         self.comments = ''
         self.bbox_x0 = np.array([0, 0])*np.nan
         self.bbox_delta = np.array([0, 0])*np.nan
@@ -47,6 +48,94 @@ class SkeletonData():
         self.filaments = []
         self.critical_points_data = []
         self.filaments_data = []
+
+        self.cp = None
+        self.fl = None
+        self.cp_data = None
+        self.fl_data = None
+
+    def load_data(self):
+        """ load data """
+        # assert that file exists
+        try:
+            assert os.path.exists(self.filepath)
+        except:
+            raise AssertionError(
+                '@Cham: file [%s] does not exist!' % self.filepath)
+
+        # read file
+        f = open(self.filepath, mode='r')
+        lines = f.readlines()
+        f.close()
+        # cut \n tails
+        lines = [_[:-1] for _ in lines]
+
+        # find line position for each data block
+        n_lines_blocks = _find_data_block_position(
+            lines,
+            keywords_list=['BBOX',
+                           '[CRITICAL POINTS]',
+                           '[FILAMENTS]',
+                           '[CRITICAL POINTS DATA]',
+                           '[FILAMENTS DATA]'],
+            verbose=True)
+
+        # 1. header
+        assert lines[0] == 'ANDSKEL'
+        self.header = lines[0]
+
+        # 2. ndim
+        self.ndim = np.int(lines[1])
+
+        # 3. comments
+        self.comments = lines[2:n_lines_blocks[0, 0]]
+
+        # 4. bbox (assumed to be single-line)
+        bbox_str_seped = lines[n_lines_blocks[0, 0]].split(' ')
+        self.bbox_x0 = np.array(eval(bbox_str_seped[1]))
+        self.bbox_delta = np.array(eval(bbox_str_seped[2]))
+
+        # 5. critical points
+        # print 'debug'
+        # print lines[n_lines_blocks[1, 0]:n_lines_blocks[1, 1]][0]
+        # print lines[n_lines_blocks[1, 0]:n_lines_blocks[1, 1]][-1]
+        self.cp = _read_data_critical_points(lines[n_lines_blocks[1, 0]:n_lines_blocks[1, 1]])
+
+        # 6. filaments
+        # print 'debug'
+        # print lines[n_lines_blocks[2, 0]:n_lines_blocks[2, 1]][0]
+        # print lines[n_lines_blocks[2, 0]:n_lines_blocks[2, 1]][-1]
+        self.fl = _read_data_filaments(lines[n_lines_blocks[2, 0]:n_lines_blocks[2, 1]])
+
+        # 7. critical points data
+        # print 'debug'
+        # print lines[n_lines_blocks[3, 0]:n_lines_blocks[3, 1]][0]
+        # print lines[n_lines_blocks[3, 0]:n_lines_blocks[3, 1]][-1]
+        self.cp_data = _read_data_data_table(lines[n_lines_blocks[3, 0]:n_lines_blocks[3, 1]])
+
+        # 8. filaments data
+        # print 'debug'
+        # print lines[n_lines_blocks[4, 0]:n_lines_blocks[4, 1]][0]
+        # print lines[n_lines_blocks[4, 0]:n_lines_blocks[4, 1]][-1]
+        self.fl_data = _read_data_data_table(lines[n_lines_blocks[4, 0]:n_lines_blocks[4, 1]])
+
+        # change flag
+        self.data_loaded = True
+        return self
+
+    def summary(self):
+        """ print a summary on screen """
+        print '@Cham: [critical points]---------------------------------------'
+        print self.cp
+        print '@Cham: [filaments]---------------------------------------------'
+        print self.fl
+        print '@Cham: [critical points data]----------------------------------'
+        print self.cp_data
+        print '@Cham: [filaments data]----------------------------------------'
+        print self.fl_data
+
+    def wirte_to_text(self):
+        pass
 
 
 class CriticalPoint():
@@ -215,69 +304,12 @@ def _find_data_block_position(lines, keywords_list, verbose=True):
 def test_on_data():
     # test data
     test_data_file_path = './data/N.fits.up.NDskl.a.NDskl'
+    skl_data = SkeletonData(test_data_file_path)
+    skl_data = skl_data.load_data()
+    skl_data.summary()
 
-    # read file
-    f = open(test_data_file_path, mode='r')
-    lines = f.readlines()
-    f.close()
-    # cut \n tails
-    lines = [_[:-1] for _ in lines]
-
-    n_lines_blocks = _find_data_block_position(
-        lines,
-        keywords_list = ['BBOX',
-                         '[CRITICAL POINTS]',
-                         '[FILAMENTS]',
-                         '[CRITICAL POINTS DATA]',
-                         '[FILAMENTS DATA]'],
-        verbose=True)
-
-    # 1. header
-    assert lines[0] == 'ANDSKEL'
-    header = lines[0]
-
-    # 2. ndim
-    ndim = np.int(lines[1])
-
-    # 3. comments
-    comments = lines[2:n_lines_blocks[0, 0]]
-
-    # 4. bbox (assumed to be single-line)
-    bbox_str_seped = lines[n_lines_blocks[0, 0]].split(' ')
-    bbox_x0 = np.array(eval(bbox_str_seped[1]))
-    bbox_delta = np.array(eval(bbox_str_seped[2]))
-
-    # 5. critical points
-    # print 'debug'
-    # print lines[n_lines_blocks[1, 0]:n_lines_blocks[1, 1]][0]
-    # print lines[n_lines_blocks[1, 0]:n_lines_blocks[1, 1]][-1]
-    cp = _read_data_critical_points(lines[n_lines_blocks[1, 0]:n_lines_blocks[1, 1]])
-
-    # 6. filaments
-    # print 'debug'
-    # print lines[n_lines_blocks[2, 0]:n_lines_blocks[2, 1]][0]
-    # print lines[n_lines_blocks[2, 0]:n_lines_blocks[2, 1]][-1]
-    fl = _read_data_filaments(lines[n_lines_blocks[2, 0]:n_lines_blocks[2, 1]])
-
-    # 7. critical points data
-    # print 'debug'
-    # print lines[n_lines_blocks[3, 0]:n_lines_blocks[3, 1]][0]
-    # print lines[n_lines_blocks[3, 0]:n_lines_blocks[3, 1]][-1]
-    cp_data = _read_data_data_table(lines[n_lines_blocks[3, 0]:n_lines_blocks[3, 1]])
-
-    # 8. filaments data
-    # print 'debug'
-    # print lines[n_lines_blocks[4, 0]:n_lines_blocks[4, 1]][0]
-    # print lines[n_lines_blocks[4, 0]:n_lines_blocks[4, 1]][-1]
-    fl_data = _read_data_data_table(lines[n_lines_blocks[4, 0]:n_lines_blocks[4, 1]])
-
-    return cp, cp_data, fl, fl_data
 
 if __name__ == '__main__':
-    import os
-    print os.getcwd()
-    result = test_on_data()
-    print result
-    print '--------------------'
-    print result[0][0]
-    print result[2][0]
+    test_on_data()
+
+
