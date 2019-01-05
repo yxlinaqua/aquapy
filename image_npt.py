@@ -29,31 +29,6 @@ def angle_between(v1, v2):
     v2_u = unit_vector(v2)
     return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
 
-
-def pairwise_angles(lines):
-
-    # line_starts = np.asarray([list(x[0]) for x in lines])
-    line_ends = np.asarray([list(x[1]) for x in lines])
-    tree = scipy.spatial.KDTree(line_ends)
-
-    angles = []
-    for i, line_A in enumerate(lines):
-
-        # Find nearest line
-        dists, j = tree.query(line_A[0])
-
-        if i == j or j > len(lines):
-            continue
-
-        line_B = lines[j]
-
-        # Calculate angle between vectors
-        a0, a1 = np.asarray(line_A)
-        b0, b1 = np.asarray(line_B)
-        angles.append(angle_between(a1 - a0, b1 - b0))
-
-    return angles
-
 def pairwise_angle(lines):
     angles = []
     for line in lines:
@@ -94,16 +69,12 @@ class Image_statistic():
                 self.twopt[pair[0]] = pair_sum/pair_num
     
     def threept_eqr(self, r, dr):
-       all_dict = {}
        triplets_all = []
        angles_all = []
        for ind in range(len(self.index[0])):
            lower = self.tree.query_ball_point((self.index[0][ind],self.index[1][ind]), r)
            upper = self.tree.query_ball_point((self.index[0][ind],self.index[1][ind]), r+dr)
-           print lower, upper, "final"
-           #all_dict[ind] = list(upper-lower)
            all_list = list(set(upper)-set(lower))
-           print all_list, "now"
            if len(all_list)>2:
                triplets = np.hstack([np.asarray([(all_list[0],all_list[i+1],all_list[j]) for j in range(len(all_list))[i+2:]]).ravel() for i in range(len(all_list)-2)])
                triplets = triplets.reshape(-1,3)
