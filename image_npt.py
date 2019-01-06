@@ -6,6 +6,8 @@ Created on Fri Jan  4 13:08:01 2019
 """
 import numpy as np
 import scipy.spatial
+from skimage.measure import perimeter
+
 #3PCF (Takada & Jain 2008)
 
 
@@ -67,7 +69,16 @@ class Image_statistic():
                 for i in range(pair_num):
                     pair_sum += (self.datalist[pair[1][i][1]]/self.mean-1)*(self.datalist[pair[1][i][0]]/self.mean-1)
                 self.twopt[pair[0]] = pair_sum/pair_num
-    
+                
+    def struc_func_simple(self, p=2):
+        for pair in self.samples.iteritems():
+            pair_sum = 0
+            pair_num = len(pair[1])
+            if pair_num > 0:
+                for i in range(pair_num):
+                    pair_sum += (self.datalist[pair[1][i][1]]-self.datalist[pair[1][i][0]])**p
+                self.twopt[pair[0]] = pair_sum/pair_num
+                
     def threept_eqr(self, r, dr):
        triplets_all = []
        angles_all = []
@@ -75,7 +86,8 @@ class Image_statistic():
            lower = self.tree.query_ball_point((self.index[0][ind],self.index[1][ind]), r)
            upper = self.tree.query_ball_point((self.index[0][ind],self.index[1][ind]), r+dr)
            all_list = list(set(upper)-set(lower))
-           if len(all_list)>2:
+           all_list.insert(0,ind)
+           if len(all_list)>3:
                triplets = np.hstack([np.asarray([(all_list[0],all_list[i+1],all_list[j]) for j in range(len(all_list))[i+2:]]).ravel() for i in range(len(all_list)-2)])
                triplets = triplets.reshape(-1,3)
                triplets_all.append(triplets)
@@ -90,5 +102,16 @@ class Image_statistic():
        for x,y in zip(self.angles,self.triplets):
            triplets_groups[x].append(y)
        return triplets_groups
-
+    
+    def peri_area_series(self, levels):
+        perimeters = np.zeros(len(levels)-1)
+        areas = np.zeros(len(levels)-1)
+        for i, level in enumerate(levels):
+            mask_image = np.ma.masked_inside(self.data,levels[i],levels[i+1])
+            mask_image_outer = np.ma.masked_greater_equal(self.data,levels[i])
+            mask_image_inner = np.ma.masked_greater_equal(self.data,levels[i+1])
+            perimeters.append((perimeter(mask_image_outer.mask)+perimeter(mask_image_inner.mask)))
+            areas.append((self.__len__-np.nansum(mask_image.mask)))
+        self.areas = areas
+        self.perimeters = perimeters
         
